@@ -25,7 +25,7 @@ void FDCAN_Init(FDCAN_Init_t *init)
 	*/
 	if (HAL_FDCAN_ConfigFilter(init->fdcan, &init->sFilterConfig) != HAL_OK)
 	{
-
+		Error_Handler(); // unlikely we'll get error, but here in case.
 	}
 
 	/* Configure global filter on both FDCAN instances:
@@ -33,13 +33,18 @@ void FDCAN_Init(FDCAN_Init_t *init)
 	     Reject non matching frames with STD ID and EXT ID */
 	if (HAL_FDCAN_ConfigGlobalFilter(init->fdcan, init->NonMatchingStd /*FDCAN_ACCEPT_IN_RX_FIFO0*/, init->NonMatchingExt /*FDCAN_ACCEPT_IN_RX_FIFO0*/, init->RejectRemoteStd /*FDCAN_FILTER_REMOTE*/, init->RejectRemoteExt/*FDCAN_FILTER_REMOTE*/) != HAL_OK)
 	{
-
+		Error_Handler();
 	}
 
-	/* Activate Rx FIFO 0 new message notification on both FDCAN instances */
-	if (HAL_FDCAN_ActivateNotification(init->fdcan, init->FDCAN_Rx_Fifo0_Interrupts/*FDCAN_IT_RX_FIFO0_NEW_MESSAGE*/, 0) != HAL_OK)
+	/* Activate notification */
+	if (HAL_FDCAN_ActivateNotification(init->fdcan, init->ActivateNotification, 0) != HAL_OK)
 	{
+		Error_Handler();
+	}
 
+	if (HAL_FDCAN_Start(init->fdcan) != HAL_OK)
+	{
+		Error_Handler();
 	}
 }
 
@@ -76,22 +81,26 @@ void FDCAN_AddDataToTxBuffer(FDCAN_Struct_t *msg, FDCAN_Tx *data)
 
 /*
  * Description: This will be called from FDCAN_AddDataToTxBuffer or HAL_FDCAN_TxBufferCompleteCallback
- * Input: The FDCAN_buffer
+ * Input: The FDCAN msg instance
  *
  */
 void FDCAN_Transmit(FDCAN_Struct_t *msg)
 {
+	FDCAN_Tx *ptr;
+
 	if(msg->tx.ptr.cnt_Handle)
 	{
-		if(!msg->tx.txPending)
+		ptr = &msg->tx.msgQueue[msg->tx.ptr.index_OUT];
+		if(HAL_FDCAN_AddMessageToTxFifoQ(msg->fdcan, &ptr->pTxHeader, ptr->data) == HAL_OK)
 		{
-			if(HAL_FDCAN_AddMessageToTxFifoQ(msg->fdcan, &msg->tx.msgQueue[msg->tx.ptr.index_OUT].pTxHeader, msg->tx.msgQueue[msg->tx.ptr.index_OUT].data) == HAL_OK)
-			{
-				msg->tx.txPending = true;
-				RingBuff_Ptr_Output(&msg->tx.ptr, msg->tx.queueSize);
-			}
+			RingBuff_Ptr_Output(&msg->tx.ptr, msg->tx.queueSize);
 		}
 	}
+}
+
+void FDCAN_Copy(FDCAN_Tx *tx, FDCAN_Rx *rx)
+{
+
 }
 
 
@@ -131,19 +140,17 @@ FDCAN_Struct_t fdcan1_msg =
 	.tx.queueSize = FDCAN1_TX_QUEUE_SIZE
 };
 
-
-// be sure to call before while loop
-HAL_FDCAN_Start(&hfdcan1);
-
-
 // add callbacks to IRQ Handler
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 {
+	FDCAN_Rx *ptr;
+
 	if(hfdcan == fdcan1_msg.fdcan)
 	{
 		if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != 0)
 		{
-			if(HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, fdcan1_msg.rx.msgQueue[fdcan1_msg.rx.ptr.index_IN].pRxHeader, fdcan1_msg.rx.msgQueue[fdcan1_msg.rx.ptr.index_IN].data) == HAL_OK)
+			ptr = &fdcan1_msg.rx.msgQueue[fdcan1_msg.rx.ptr.index_IN];
+			if(HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &ptr->pRxHeader, ptr->data) == HAL_OK)
 			{
 				RingBuff_Ptr_Input(&fdcan1_msg.rx.ptr, fdcan1_msg.rx.queueSize);
 			}
@@ -151,16 +158,13 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 	}
 }
 
-void HAL_FDCAN_TxBufferCompleteCallback(FDCAN_HandleTypeDef *hfdcan, uint32_t BufferIndexes)
+void HAL_FDCAN_TxFifoEmptyCallback(FDCAN_HandleTypeDef *hfdcan)
 {
 	if(hfdcan == fdcan1_msg.fdcan)
 	{
-		fdcan1_msg.tx.txPending = false;
 		FDCAN_Transmit(&fdcan1_msg); // transmit if more message in queue
 	}
 }
 
-
-
- */
+*/
 

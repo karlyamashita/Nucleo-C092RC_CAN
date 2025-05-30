@@ -37,10 +37,13 @@
 void PollingInit(void);
 void PollingRoutine(void);
 
-void FDCAN_Parse(FDCAN_Struct_t *msg);
 void UART_Parse(UART_DMA_Struct_t *msg);
+void FDCAN_Parse(FDCAN_Struct_t *msg);
 
 int Version(char *msg, char *retStr);
-
+void STM32_Ready(void);
+void ButtonCheck(void);
+void CAN_Send_FD_Format(FDCAN_Struct_t *msg, char *data);
+void CAN_Send_Classic_Format(FDCAN_Struct_t *msg, char *data);
 
 #endif /* INC_POLLINGROUTINE_H_ */

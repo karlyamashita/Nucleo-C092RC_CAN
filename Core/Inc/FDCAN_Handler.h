@@ -23,13 +23,13 @@ typedef struct
 	uint32_t RejectRemoteStd; // FDCAN_FILTER_REMOTE | FDCAN_REJECT_REMOTE
 	uint32_t RejectRemoteExt; // FDCAN_FILTER_REMOTE | FDCAN_REJECT_REMOTE
 	// HAL_FDCAN_ActivateNotification
-	uint32_t FDCAN_Rx_Fifo0_Interrupts; // FDCAN_IT_RX_FIFO0_MESSAGE_LOST | FDCAN_IT_RX_FIFO0_FULL | FDCAN_IT_RX_FIFO0_NEW_MESSAGE
+	uint32_t ActivateNotification; // FDCAN_IT_RX_FIFO0_MESSAGE_LOST | FDCAN_IT_RX_FIFO0_FULL | FDCAN_IT_RX_FIFO0_NEW_MESSAGE
 }FDCAN_Init_t;
 
 
 typedef struct
 {
-	FDCAN_RxHeaderTypeDef *pRxHeader;
+	FDCAN_RxHeaderTypeDef pRxHeader;
 	uint8_t data[64];
 }FDCAN_Rx;
 
@@ -55,7 +55,6 @@ typedef struct
 		FDCAN_Tx *msgQueue;
 		RING_BUFF_STRUCT ptr;
 		uint32_t queueSize;
-		bool txPending;
 	}tx;
 }FDCAN_Struct_t;
 
@@ -68,5 +67,6 @@ int FDCAN_MsgReady(FDCAN_Struct_t *msg);
 void FDCAN_AddDataToTxBuffer(FDCAN_Struct_t *fdcanBuffer, FDCAN_Tx *data);
 void FDCAN_Transmit(FDCAN_Struct_t *fdcanBuffer);
 
+void FDCAN_Copy(FDCAN_Tx *tx, FDCAN_Rx *rx);
 
 #endif /* INC_FDCAN_HANDLER_H_ */
